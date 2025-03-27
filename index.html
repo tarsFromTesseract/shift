@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: monospace;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+        }
+        .main-container {
+            display: flex;
+            gap: 20px;
+        }
+        .terminal, .sidebar, .logs {
+            border: 1px solid #444;
+            padding: 10px;
+            overflow-y: auto;
+            border-radius: 5px;
+        }
+        .sidebar {
+            width: 25%;
+            height: 500px;
+            background-color: #1e1e1e;
+        }
+        .terminal {
+            width: 70%;
+            height: 500px;
+            background-color: #1e1e1e;
+            white-space: pre-line;
+        }
+        .logs {
+            width: 98%;
+            height: 150px;
+            background: #1e1e1e;
+        }
+        .conversation-item {
+            cursor: pointer;
+            padding: 5px;
+            border-bottom: 1px solid #444;
+        }
+        .conversation-item.active {
+            background-color: #4caf50;
+            color: white;
+        }
+        input, button {
+            background: #1e1e1e;
+            border: 1px solid #555;
+            color: #e0e0e0;
+            padding: 5px;
+            font-family: monospace;
+            border-radius: 3px;
+        }
+        button:hover {
+            background: #4caf50;
+            color: white;
+            border: 1px solid #4caf50;
+        }
+        .input-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .input-container span {
+            color: #4caf50;
+            font-weight: bold;
+        }
+        #messageInput {
+            flex: 1;
+            background: #1e1e1e;
+            border: none;
+            color: #e0e0e0;
+            padding: 5px;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="main-container">
+    <div class="sidebar">
+        <button onclick="loadConversations()">Load users Conversations</button>
+        <div id="conversationList"></div>
+    </div>
+
+    <div class="terminal">
+        <div id="receiveConsole"></div>
+        <div class="input-container">
+            <span>$</span>
+            <input type="text" id="messageInput" placeholder="Write a message..." onkeypress="handleKeyPress(event)">
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+</div>
+
+<div class="logs">
+    <h3>Logs</h3>
+    <div id="logConsole"></div>
+</div>
+
+<div class="input-container">
+    <span>JWT:</span>
+    <input type="text" id="jwtInput" placeholder="Enter JWT token...">
+    <button onclick="updateBearerToken()">Submit jwt</button>
+</div>
+<script>
+    let bearerToken = ''
+    let currentRecipientUuid = null;
+    function updateBearerToken() {
+        bearerToken = 'Bearer ' + document.getElementById("jwtInput").value;
+        logAction("> Define global JWT");
+    }
+
+    function printToConsole(consoleId, text, isError = false) {
+        const consoleDiv = document.getElementById(consoleId);
+        const message = document.createElement("div");
+        message.textContent = text;
+        if (isError) {
+            message.style.color = "red";
+        }
+        consoleDiv.appendChild(message);
+        let messageBody = document.querySelector('.logs');
+        messageBody.scrollTop = messageBody.scrollHeight - messageBody.clientHeight;
+    }
+
+    function logAction(action, isError = false) {
+        printToConsole("logConsole", action, isError);
+    }
+
+    async function loadConversations() {
+        logAction("> GET /api/users - Loading...");
+        const response = await fetch('http://127.0.0.1:8080/api/users', {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': bearerToken
+            },
+        });
+
+        if (!response.ok) {
+            logAction(`API Error: ${response.status}`, true);
+            return;
+        }
+
+        const users = await response.json();
+        const conversationList = document.getElementById('conversationList');
+        conversationList.innerHTML = "";
+
+        users.forEach(user => {
+            const item = document.createElement("div");
+            item.classList.add("conversation-item");
+            item.textContent = `Conversation with ${user.username}`;
+            item.onclick = () => selectConversation(user.id, item);
+            conversationList.appendChild(item);
+        });
+
+        logAction("Conversations successfully loaded!");
+    }
+
+    function selectConversation(recipientUuid, item) {
+        currentRecipientUuid = recipientUuid;
+        document.querySelectorAll(".conversation-item").forEach(el => el.classList.remove("active"));
+        item.classList.add("active");
+        loadMessages(recipientUuid);
+    }
+
+    async function loadMessages(recipientUuid) {
+        logAction(`> GET /api/conversations/${recipientUuid} - Loading messages...`);
+        const response = await fetch(`http://127.0.0.1:8080/api/conversations/${recipientUuid}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': bearerToken
+            },
+        });
+
+        if (!response.ok) {
+            logAction(`API Error: ${response.status}`, true);
+            return;
+        }
+
+        const messages = await response.json();
+        const terminal = document.getElementById('receiveConsole');
+        terminal.innerHTML = "";
+        messages.forEach(msg => {
+            printToConsole("receiveConsole", `[${msg.createdAt}] [${msg.senderUuid !== recipientUuid ? "Me": "Him"}] ${msg.content}`);
+        });
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById("messageInput");
+        const messageContent = input.value.trim();
+
+        if (!currentRecipientUuid) {
+            logAction("Error: Select a conversation before sending a message.", true);
+            return;
+        }
+
+        if (messageContent === "") {
+            logAction("Error: Cannot send an empty message.", true);
+            return;
+        }
+
+        const payload = JSON.stringify({
+            recipient: currentRecipientUuid,
+            content: messageContent
+        });
+
+        logAction(`> POST /api/messages - Sending...
+Payload: ${payload}`);
+
+        const response = await fetch("http://127.0.0.1:8080/api/messages", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": bearerToken
+            },
+            body: payload
+        });
+
+        if (!response.ok) {
+            logAction(`API Error: ${response.status}`, true);
+            return;
+        }
+
+        printToConsole("receiveConsole", `[Me] ${messageContent}`);
+        logAction("Message successfully sent!");
+        input.value = "";
+    }
+
+    function handleKeyPress(event) {
+        if (event.key === "Enter") {
+            sendMessage();
+        }
+    }
+</script>
+
+</body>
+</html>
