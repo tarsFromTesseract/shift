@@ -6,77 +6,128 @@
         body {
             background-color: #121212;
             color: #e0e0e0;
-            font-family: monospace;
+            font-family: 'Arial', sans-serif;
             display: flex;
             flex-direction: column;
-            gap: 20px;
-            padding: 20px;
+            gap: 30px;
+            padding: 30px;
+            margin: 0;
+        }
+        h3 {
+            margin-bottom: 15px;
+            color: #4caf50;
         }
         .main-container {
             display: flex;
+            justify-content: space-between;
             gap: 20px;
         }
-        .terminal, .sidebar, .logs {
+        .register, .sidebar, .logs, .jwt-container {
             border: 1px solid #444;
-            padding: 10px;
-            overflow-y: auto;
-            border-radius: 5px;
-        }
-        .sidebar {
-            width: 25%;
-            height: 500px;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
             background-color: #1e1e1e;
+            color: #e0e0e0;
+        }
+        .sidebar, .terminal {
+            width: 48%;
+        }
+        .register, .logs {
+            width: 95%;
         }
         .terminal {
-            width: 70%;
             height: 500px;
-            background-color: #1e1e1e;
+            overflow-y: auto;
             white-space: pre-line;
         }
+        .sidebar {
+            height: 500px;
+            overflow-y: auto;
+        }
         .logs {
-            width: 98%;
             height: 150px;
             background: #1e1e1e;
+            border-top: 2px solid #444;
+            overflow-y: auto;
+            /* Scroll automatique */
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+        }
+        .jwt-container {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            align-items: center;
+            width: 95%;
+        }
+        .input-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        input, button {
+            background: #333;
+            border: 1px solid #555;
+            color: #e0e0e0;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            outline: none;
+        }
+        button {
+            cursor: pointer;
+            transition: background 0.3s ease, border 0.3s ease;
+        }
+        button:hover {
+            background: #4caf50;
+            border: 1px solid #4caf50;
+        }
+        input:focus, button:focus {
+            border-color: #4caf50;
         }
         .conversation-item {
             cursor: pointer;
-            padding: 5px;
+            padding: 12px;
             border-bottom: 1px solid #444;
+            transition: background 0.3s ease;
         }
         .conversation-item.active {
             background-color: #4caf50;
             color: white;
         }
-        input, button {
-            background: #1e1e1e;
-            border: 1px solid #555;
-            color: #e0e0e0;
-            padding: 5px;
-            font-family: monospace;
-            border-radius: 3px;
-        }
-        button:hover {
-            background: #4caf50;
-            color: white;
-            border: 1px solid #4caf50;
-        }
-        .input-container {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-top: 10px;
-        }
-        .input-container span {
-            color: #4caf50;
-            font-weight: bold;
+        .conversation-item:hover {
+            background-color: #333;
         }
         #messageInput {
             flex: 1;
             background: #1e1e1e;
-            border: none;
             color: #e0e0e0;
-            padding: 5px;
+            padding: 10px;
+            font-size: 16px;
+            border: none;
             outline: none;
+        }
+        .accordion {
+            cursor: pointer;
+            padding: 10px;
+            width: 97%;
+            text-align: left;
+            background-color: #333;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            transition: background 0.3s ease;
+        }
+        .accordion:hover {
+            background-color: #4caf50;
+        }
+        .panel {
+            display: none;
+            overflow: hidden;
         }
     </style>
 </head>
@@ -84,7 +135,7 @@
 
 <div class="main-container">
     <div class="sidebar">
-        <button onclick="loadConversations()">Load users Conversations</button>
+        <button onclick="loadConversations()">Load Conversations</button>
         <div id="conversationList"></div>
     </div>
 
@@ -103,14 +154,42 @@
     <div id="logConsole"></div>
 </div>
 
-<div class="input-container">
+<div class="jwt-container">
     <span>JWT:</span>
     <input type="text" id="jwtInput" placeholder="Enter JWT token...">
-    <button onclick="updateBearerToken()">Submit jwt</button>
+    <button onclick="updateBearerToken()">Submit JWT</button>
 </div>
+
+<button class="accordion">Login</button>
+<div class="panel">
+    <div class="register">
+        <h3>Login</h3>
+        <div class="input-container">
+            <input type="text" id="usernamelogin" placeholder="Username">
+            <input type="password" id="passwordlogin" placeholder="Password">
+            <button onclick="loginUser()">Login</button>
+        </div>
+        <div id="tokenDisplay"></div>
+    </div>
+</div>
+
+<button class="accordion">Register</button>
+<div class="panel">
+    <div class="register">
+        <h3>Register</h3>
+        <div class="input-container">
+            <input type="text" id="username" placeholder="Username">
+            <input type="email" id="email" placeholder="Email">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="registerUser()">Sign Up</button>
+        </div>
+    </div>
+</div>
+
 <script>
     let bearerToken = ''
     let currentRecipientUuid = null;
+
     function updateBearerToken() {
         bearerToken = 'Bearer ' + document.getElementById("jwtInput").value;
         logAction("> Define global JWT");
@@ -154,7 +233,7 @@
         users.forEach(user => {
             const item = document.createElement("div");
             item.classList.add("conversation-item");
-            item.textContent = `Conversation with ${user.username}`;
+            item.innerHTML = `Conversation with ${user.username}`;
             item.onclick = () => selectConversation(user.id, item);
             conversationList.appendChild(item);
         });
@@ -188,7 +267,7 @@
         const terminal = document.getElementById('receiveConsole');
         terminal.innerHTML = "";
         messages.forEach(msg => {
-            printToConsole("receiveConsole", `[${msg.createdAt}] [${msg.senderUuid !== recipientUuid ? "Me": "Him"}] ${msg.content}`);
+            printToConsole("receiveConsole", `[${msg.createdAt}] [${msg.senderUuid !== recipientUuid ? "me": "other"}] ${msg.content}`);
         });
     }
 
@@ -237,6 +316,99 @@ Payload: ${payload}`);
         if (event.key === "Enter") {
             sendMessage();
         }
+    }
+
+    async function registerUser() {
+        const usernameField = document.getElementById("username");
+        const emailField = document.getElementById("email");
+        const passwordField = document.getElementById("password");
+        const username = usernameField.value.trim();
+        const email = emailField.value.trim();
+        const password = passwordField.value.trim();
+
+        if (!username || !email || !password) {
+            logAction("Error: All fields are required.", true);
+            return;
+        }
+
+        const payload = JSON.stringify({ username, email, password });
+        logAction(`> POST /api/users/register - Sending...\nPayload: ${payload}`);
+
+        try {
+            const response = await fetch("https://symfony-cloud-deploy-ck5gpai-hrrtqlzxcb2tk.fr-3.platformsh.site/api/users/register", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: payload
+            });
+
+            if (!response.ok) {
+                logAction(`API Error: ${response.status}`, true);
+                return;
+            }
+
+            logAction("User successfully registered!");
+        } catch (error) {
+            logAction(`Request failed: ${error.message}`, true);
+        } finally {
+            usernameField.value = "";
+            emailField.value = "";
+            passwordField.value = "";
+        }
+    }
+
+    async function loginUser() {
+        const usernameField = document.getElementById("usernamelogin");
+        const passwordField = document.getElementById("passwordlogin");
+        const username = usernameField.value.trim();
+        const password = passwordField.value.trim();
+
+        if (!username || !password) {
+            logAction("Error: Username and password are required.", true);
+            return;
+        }
+
+        const payload = JSON.stringify({ username, password });
+        logAction(`> POST /api/login - Sending...\nPayload: ${payload}`);
+
+        try {
+            const response = await fetch("https://symfony-cloud-deploy-ck5gpai-hrrtqlzxcb2tk.fr-3.platformsh.site/api/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: payload
+            });
+
+            if (!response.ok) {
+                logAction(`API Error: ${response.status}`, true);
+                return;
+            }
+
+            const data = await response.json();
+            logAction("Login successful!");
+            document.getElementById("tokenDisplay").textContent = `Token: ${data.token}`;
+        } catch (error) {
+            logAction(`Request failed: ${error.message}`, true);
+        } finally {
+            usernameField.value = "";
+            passwordField.value = "";
+        }
+    }
+
+    // Accordion function
+    const acc = document.getElementsByClassName("accordion");
+    for (let i = 0; i < acc.length; i++) {
+        acc[i].addEventListener("click", function() {
+            this.classList.toggle("active");
+            const panel = this.nextElementSibling;
+            if (panel.style.display === "block") {
+                panel.style.display = "none";
+            } else {
+                panel.style.display = "block";
+            }
+        });
     }
 </script>
 
